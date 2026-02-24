@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Neon Audio Pong</title>
+    <style>
+      body {
+        background: #050505;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        color: #555;
+        font-family: "Courier New", Courier, monospace;
+      }
+      canvas {
+        border: 5px solid #333;
+        box-shadow: 0 0 30px rgba(255, 255, 255, 0.05);
+        cursor: none;
+      }
+      p {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="pongCanvas" width="800" height="400"></canvas>
+    <p>Move your mouse to play. Click to enable sound if it's muted.</p>
+
+    <script>
+      const canvas = document.getElementById("pongCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Audio Context (Browser requires a click/interaction to start)
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      function playBeep(frequency, duration) {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "square"; // Retro 8-bit sound
+        osc.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          audioCtx.currentTime + duration,
+        );
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }
+
+      // Game variables
+      const paddleWidth = 10,
+        paddleHeight = 100;
+      let userY = 150,
+        aiY = 150;
+      let ballX = 400,
+        ballY = 200;
+      let ballDX = 5,
+        ballDY = 5;
+      let userScore = 0,
+        aiScore = 0;
+      let accentColor = "#00FF00"; // Start with Neon Green
+
+      function changeColor() {
+        const colors = [
+          "#00FF00",
+          "#FF00FF",
+          "#00FFFF",
+          "#FFFF00",
+          "#FF4500",
+          "#FFFFFF",
+        ];
+        accentColor = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      canvas.addEventListener("mousemove", (e) => {
+        let rect = canvas.getBoundingClientRect();
+        userY = e.clientY - rect.top - paddleHeight / 2;
+      });
+
+      function draw() {
+        // Clear Canvas
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)"; // Slight trail effect
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Net
+        ctx.strokeStyle = "#333";
+        ctx.setLineDash([10, 10]);
+        ctx.strokeRect(canvas.width / 2, 0, 1, canvas.height);
+
+        // Draw Everything with the Accent Color
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(0, userY, paddleWidth, paddleHeight);
+        ctx.fillRect(
+          canvas.width - paddleWidth,
+          aiY,
+          paddleWidth,
+          paddleHeight,
+        );
+
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = "50px Courier New";
+        ctx.globalAlpha = 0.3;
+        ctx.fillText(userScore, canvas.width / 4, 60);
+        ctx.fillText(aiScore, (3 * canvas.width) / 4, 60);
+        ctx.globalAlpha = 1.0;
+
+        update();
+        requestAnimationFrame(draw);
+      }
+
+      function update() {
+        ballX += ballDX;
+        ballY += ballDY;
+
+        // AI Logic
+        aiY += (ballY - (aiY + paddleHeight / 2)) * 0.09;
+
+        // Wall collisions
+        if (ballY <= 0 || ballY >= canvas.height) {
+          ballDY *= -1;
+          playBeep(300, 0.1); // Low beep
+        }
+
+        // Paddle collisions
+        if (
+          ballX <= paddleWidth &&
+          ballY > userY &&
+          ballY < userY + paddleHeight
+        ) {
+          ballDX = Math.abs(ballDX) * 1.05; // Speed up
+          playBeep(600, 0.1); // High beep
+        }
+        if (
+          ballX >= canvas.width - paddleWidth &&
+          ballY > aiY &&
+          ballY < aiY + paddleHeight
+        ) {
+          ballDX = -Math.abs(ballDX) * 1.05;
+          playBeep(600, 0.1);
+        }
+
+        // Scoring
+        if (ballX < 0 || ballX > canvas.width) {
+          if (ballX < 0) aiScore++;
+          else userScore++;
+          playBeep(150, 0.5); // Score buzz
+          changeColor();
+          resetBall();
+        }
+      }
+
+      function resetBall() {
+        ballX = canvas.width / 2;
+        ballY = canvas.height / 2;
+        ballDX = Math.random() > 0.5 ? 5 : -5;
+        ballDY = Math.random() > 0.5 ? 5 : -5;
+      }
+
+      draw();
+    </script>
+  </body>
+</html>
